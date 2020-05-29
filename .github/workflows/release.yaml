@@ -62,7 +62,7 @@ jobs:
           mariadb:
             deployChart: true
             rootUser:
-              password: "${{ secrets.MARIADB_ROOT_PASSWORD }}
+              password: "${{ secrets.MARIADB_ROOT_PASSWORD }}"
             db:
               name: "${{ secrets.MARIADB_DB_NAME }}"
               user: "${{ secrets.MARIADB_USER }}"
