@@ -1,0 +1,74 @@
+name: release
+on:
+  push:
+    branches:
+      - master
+
+# Environment variables available to all jobs and steps in this workflow
+env:
+  REGISTRY_NAME: k8scc01covidacr
+  CLUSTER_NAME: k8s-cancentral-02-covid-aks
+  CLUSTER_RESOURCE_GROUP: k8s-cancentral-01-covid-aks
+  STORAGE_ACCOUNT_NAME: k8scovid
+  NAMESPACE: web
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: azure/aks-set-context@v1
+      with:
+        creds: '${{ secrets.AZURE_CREDENTIALS }}'
+        cluster-name: ${{ env.CLUSTER_NAME }}
+        resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}
+
+    # Clone the Helm chart
+    - run: |
+        git clone https://github.com/statcan/charts.git
+        mkdir -p /home/runner/work/_temp/_github_home/
+        cp $KUBECONFIG /home/runner/work/_temp/_github_home/KUBECONFIG
+
+    # Deploy Helm chart
+    - uses: 'statcan/actions/helm@master'
+      env:
+        KUBECONFIG: /github/home/KUBECONFIG
+      with:
+        release: 'matomo'
+        namespace: 'web'
+        tillerNamespace: 'web'
+        chart: './charts/stable/matomo'
+        token: '${{ github.token }}'
+        values: |
+          replicaCount: 1
+          matomoEmail: "${{ secrets.MATOMO_EMAIL }}"
+          matomoUsername: "${{ secrets.MATOMO_USERNAME }}"
+          matomoPassword: "${{ secrets.MATOMO_PASSWORD }}"
+          image:
+            repository: bitnami/matomo
+            tag: 3.13.5
+            pullPolicy: IfNotPresent
+          ingress:
+            enabled: true
+            hosts:
+              - "matomo.covid.cloud.statcan.ca"  
+            annotations: 
+              kubernetes.io/ingress.class: "istio"
+          volumeClaim:
+            accessModes:
+              - ReadWriteOnce
+            size: 2Gi
+          smtp:
+            enabled: false
+          mariadb:
+            deployChart: true
+            rootUser:
+              password: "${{ secrets.MARIADB_ROOT_PASSWORD }}
+            db:
+              name: "${{ secrets.MARIADB_DB_NAME }}"
+              user: "${{ secrets.MARIADB_USER }}"
+              password: "${{ secrets.MARIADB_PASSWORD }}"
+            replication:
+              enabled: false
+            master: 
+              persistence:
+                size: 10Gi
